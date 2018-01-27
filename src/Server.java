@@ -45,27 +45,7 @@ public class Server {
 				// Création d'un input stream. Ce stream contiendra les données envoyées par le
 				// client.
 				if (getLoginInfo(socket, in, out)){
-					InputStream inputStream = socket.getInputStream();
-			        byte[] sizeAr = new byte[4];
-			        inputStream.read(sizeAr);
-			        int size = ByteBuffer.wrap(sizeAr).asIntBuffer().get();
-			        byte[] imageAr = new byte[size];
-			        inputStream.read(imageAr);
-			        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
-			        
-			        Sobel sobel = new Sobel();
-			        BufferedImage newImage = sobel.process(image);
-			       
-			        OutputStream outputStream = socket.getOutputStream();
-					ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-			        ImageIO.write(image, "jpg", byteArrayOutputStream);
-			        byte[] sizeW = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
-			        outputStream.write(sizeW);
-			        outputStream.write(byteArrayOutputStream.toByteArray());
-			        outputStream.flush();
-			        
-			        
-			        ImageIO.write(newImage, "jpg", new File("test2.jpg"));
+					convertImage(socket);
 				};
 				/*// La fonction readObject est bloquante! Ainsi, le serveur arrête son exécution
 				// et attend la réception de l'objet envoyé par le client!
@@ -123,7 +103,26 @@ public class Server {
 		return loginIsSuccessful;
 
 	}
-
-
+	
+	public static void convertImage(Socket socket) throws IOException{
+		InputStream inputStream = socket.getInputStream();
+        byte[] sizeAr = new byte[4];
+        inputStream.read(sizeAr);
+        int sizeI = ByteBuffer.wrap(sizeAr).asIntBuffer().get();
+        byte[] imageAr = new byte[sizeI];
+        inputStream.read(imageAr);
+        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
+        
+        Sobel sobel = new Sobel();
+        BufferedImage newImage = sobel.process(image);
+       
+        OutputStream outputStream = socket.getOutputStream();
+		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+        ImageIO.write(newImage, "jpg", byteArrayOutputStream);
+        byte[] sizeO = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
+        outputStream.write(sizeO);
+        outputStream.write(byteArrayOutputStream.toByteArray());
+        outputStream.flush();
+	}
 
 }
