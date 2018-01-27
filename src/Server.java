@@ -1,13 +1,22 @@
+import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
 import java.util.Scanner;
 import java.io.BufferedOutputStream;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Stack;
+
+import javax.imageio.ImageIO;
 
 //Implémentation possible du serveur à l'aide d'une stack pour l'exercice 2 de la 
 //section 4.1 du TP1 - INF3405 H2018
@@ -35,7 +44,29 @@ public class Server {
 				socket = serverSocket.accept();
 				// Création d'un input stream. Ce stream contiendra les données envoyées par le
 				// client.
-				getLoginInfo(socket, in, out);
+				if (getLoginInfo(socket, in, out)){
+					InputStream inputStream = socket.getInputStream();
+			        byte[] sizeAr = new byte[4];
+			        inputStream.read(sizeAr);
+			        int size = ByteBuffer.wrap(sizeAr).asIntBuffer().get();
+			        byte[] imageAr = new byte[size];
+			        inputStream.read(imageAr);
+			        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
+			        
+			        Sobel sobel = new Sobel();
+			        BufferedImage newImage = sobel.process(image);
+			       
+			        OutputStream outputStream = socket.getOutputStream();
+					ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+			        ImageIO.write(image, "jpg", byteArrayOutputStream);
+			        byte[] sizeW = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
+			        outputStream.write(sizeW);
+			        outputStream.write(byteArrayOutputStream.toByteArray());
+			        outputStream.flush();
+			        
+			        
+			        ImageIO.write(newImage, "jpg", new File("test2.jpg"));
+				};
 				/*// La fonction readObject est bloquante! Ainsi, le serveur arrête son exécution
 				// et attend la réception de l'objet envoyé par le client!
 				List<String> strings = (List<String>) in.readObject();

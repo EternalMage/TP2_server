@@ -3,7 +3,7 @@ import java.io.IOException;
 
 public class Sobel {
     
-	public static BufferedImage process(BufferedImage image) throws IOException 
+	public BufferedImage process(BufferedImage image) throws IOException 
 	{
 	  System.out.println("applying filter");
 	
