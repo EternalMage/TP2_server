@@ -81,15 +81,15 @@ public class Server {
 		// CHERCHER AVEC JSON if (pass and user in database)
 		if (user.equals("monster") && pass.equals("123")){
 			System.out.println("Logged in successfully");
-			return true;
+			loginIsSuccessful = true;
 		}
 		else{
 			System.out.println("Login error!");
 			loginIsSuccessful = false;
-			out.writeObject("Login has failed my man");
-			out.flush();
-			return false;
 		}
+		out.writeObject(loginIsSuccessful);
+		out.flush();
+		return loginIsSuccessful;
 
 	}
 
