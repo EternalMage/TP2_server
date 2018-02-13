@@ -13,6 +13,8 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.BufferedReader;
@@ -29,8 +31,11 @@ import javax.imageio.ImageIO;
 //pour qu'il puisse avoir la capacité d'accepter plusieurs clients.
 public class Server {
 	@SuppressWarnings("resource")
+	private static String IPAddress = "127.0.0.1";
+	private static int port;
+	
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
-
+		
 		Scanner sc = new Scanner(System.in);
 		ServerSocket serverSocket = null;
 		Socket socket = null;
@@ -40,7 +45,7 @@ public class Server {
 		ArrayList<String> passArray = new ArrayList<String>();
 		String dbName = "text.txt";
 		System.out.println("Entrez un port entre 5000 et 5050: ");
-		int port = sc.nextInt();
+		port = sc.nextInt();
 		
 		if (verifyPort(port)){ // si port est valide, on peut run le server
 			serverSocket = new ServerSocket(port);
@@ -103,7 +108,7 @@ public class Server {
 				if (i == userL.size() - 1){
 					userL.add(user);
 					passL.add(pass);
-					System.out.println(user + " logged in successfully!");
+					System.out.println("Created this new user.");
 					loginIsSuccessful = true;
 				}
 			}
@@ -115,7 +120,13 @@ public class Server {
 
 	}
 
-	public static void convertImage(Socket socket) throws IOException{
+	public static void convertImage(Socket socket) throws IOException, ClassNotFoundException{
+		DateFormat dateFormat = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
+		Date date = new Date();
+		
+		ObjectInputStream in = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
+		String username = (String) in.readObject();
+		String imageFileName = (String) in.readObject();
 		InputStream inputStream = socket.getInputStream();
 		byte[] sizeAr = new byte[4];
 		inputStream.read(sizeAr);
@@ -123,7 +134,9 @@ public class Server {
 		byte[] imageAr = new byte[sizeI];
 		inputStream.read(imageAr);
 		BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
-
+		
+		System.out.println(username + " - " + IPAddress + ":" + port + " - " + dateFormat.format(date) + ": Image " + imageFileName + " reçue pour traitement.");
+		
 		Sobel sobel = new Sobel();
 		BufferedImage newImage = sobel.process(image);
 
@@ -173,6 +186,9 @@ public class Server {
 			try {
 				convertImage(socket);
 			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			} catch (ClassNotFoundException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
