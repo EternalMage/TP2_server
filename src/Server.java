@@ -1,6 +1,6 @@
 import java.awt.image.BufferedImage;
 import java.io.BufferedInputStream;
-import java.util.Scanner;
+import java.util.*;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -13,8 +13,11 @@ import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.Stack;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 
 import javax.imageio.ImageIO;
 
@@ -25,48 +28,46 @@ import javax.imageio.ImageIO;
 //plusieurs clients en même temps au serveur ne fonctionnera pas! À vous de threader le serveur 
 //pour qu'il puisse avoir la capacité d'accepter plusieurs clients.
 public class Server {
+	@SuppressWarnings("resource")
 	public static void main(String[] args) throws IOException, ClassNotFoundException {
-		while (true) {
-			Scanner sc = new Scanner(System.in);
-			ServerSocket serverSocket = null;
-			Socket socket = null;
-			ObjectInputStream in = null;
-			ObjectOutputStream out = null;
-			System.out.println("Loop");
-			try {
-				System.out.println("Entrez un port entre 5000 et 5050: ");
-				int port = sc.nextInt();
-				verifyPort(port);
-				// Création du socket du serveur en utilisant le port 5000.
-				serverSocket = new ServerSocket(port);
-				// Ici, la fonction accept est bloquante! Ainsi, l'exécution du serveur s'arrête
-				// ici et attend la connection d'un client avant de poursuivre.
-				socket = serverSocket.accept();
-				// Création d'un input stream. Ce stream contiendra les données envoyées par le
-				// client.
-				if (getLoginInfo(socket, in, out)){
-					convertImage(socket);
-				};
-				/*// La fonction readObject est bloquante! Ainsi, le serveur arrête son exécution
-				// et attend la réception de l'objet envoyé par le client!
-				List<String> strings = (List<String>) in.readObject();
-				Stack<String> stackOfLines = new Stack<String>();
-				// Remplissage de la stack avec les lignes. La première ligne entrée sera la
-				// dernière à ressortir.
-				for (int i = 0; i < strings.size(); i++) {
-					stackOfLines.push(strings.get(i));
-				}
-				// Création du output stream. Ce stream contiendra les données qui seront
-				// envoyées au client.
-				out = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
-				// Écriture des données dans la pile.
-				out.writeObject(stackOfLines);
-				// Envoi des données vers le client. */
-				//out.flush();
-			} finally {
-				System.out.println("Closing server socket");
-				serverSocket.close();
-				socket.close();
+
+		Scanner sc = new Scanner(System.in);
+		ServerSocket serverSocket = null;
+		Socket socket = null;
+		ObjectInputStream in = null;
+		ObjectOutputStream out = null;
+		ArrayList<String> userArray = new ArrayList<String>();
+		ArrayList<String> passArray = new ArrayList<String>();
+		String dbName = "text.txt";
+		System.out.println("Entrez un port entre 5000 et 5050: ");
+		int port = sc.nextInt();
+		
+		if (verifyPort(port)){ // si port est valide, on peut run le server
+			serverSocket = new ServerSocket(port);
+			while (true) {
+					System.out.println("Loop");
+					readDB(dbName, userArray, passArray); // update db
+					socket = serverSocket.accept();
+					int temp = userArray.size();
+					if (getLoginInfo(socket, in, out, userArray, passArray)){
+						if (temp < userArray.size()) {
+							try {
+								FileWriter fileWriter = new FileWriter(dbName, true);
+								BufferedWriter bufferedWriter = new BufferedWriter(fileWriter);
+								bufferedWriter.newLine();
+								bufferedWriter.write(userArray.get(temp));
+								bufferedWriter.newLine();
+								bufferedWriter.write(passArray.get(temp));
+								bufferedWriter.close();
+							}
+							catch(IOException ex) {
+								System.out.println(
+										"Error writing to file '" + dbName + "'");
+							}
+						}
+						Thread thread = new socketHandler(socket);
+					    thread.start();
+					};
 			}
 		}
 	}
@@ -81,47 +82,100 @@ public class Server {
 		}
 	}
 
-	public static boolean getLoginInfo(Socket socket, ObjectInputStream in, ObjectOutputStream out) throws IOException, ClassNotFoundException{
+	public static boolean getLoginInfo(Socket socket, ObjectInputStream in, ObjectOutputStream out, ArrayList<String> userL, ArrayList<String> passL) throws IOException, ClassNotFoundException{
 		in = new ObjectInputStream(new BufferedInputStream(socket.getInputStream()));
 		out = new ObjectOutputStream(new BufferedOutputStream(socket.getOutputStream()));
 		String user = (String) in.readObject();
 		String pass = (String) in.readObject();
-		System.out.println(user + pass);
-		boolean loginIsSuccessful;
+		boolean loginIsSuccessful = false;
 
-		// CHERCHER AVEC JSON if (pass and user in database)
-		if (user.equals("monster") && pass.equals("123")){
-			System.out.println("Logged in successfully");
-			loginIsSuccessful = true;
+		for (int i = 0; i < userL.size(); i++) {
+			if (user.equals(userL.get(i))) {
+				if (pass.equals(passL.get(i))){
+					System.out.println(user + " logged in successfully!");
+					loginIsSuccessful = true;
+					i = userL.size();
+				} else {
+					System.out.println("Login error!");
+					i = userL.size();
+				}
+			} else {
+				if (i == userL.size() - 1){
+					userL.add(user);
+					passL.add(pass);
+					System.out.println(user + " logged in successfully!");
+					loginIsSuccessful = true;
+				}
+			}
 		}
-		else{
-			System.out.println("Login error!");
-			loginIsSuccessful = false;
-		}
+
 		out.writeObject(loginIsSuccessful);
 		out.flush();
 		return loginIsSuccessful;
 
 	}
-	
+
 	public static void convertImage(Socket socket) throws IOException{
 		InputStream inputStream = socket.getInputStream();
-        byte[] sizeAr = new byte[4];
-        inputStream.read(sizeAr);
-        int sizeI = ByteBuffer.wrap(sizeAr).asIntBuffer().get();
-        byte[] imageAr = new byte[sizeI];
-        inputStream.read(imageAr);
-        BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
-        
-        Sobel sobel = new Sobel();
-        BufferedImage newImage = sobel.process(image);
-       
-        OutputStream outputStream = socket.getOutputStream();
+		byte[] sizeAr = new byte[4];
+		inputStream.read(sizeAr);
+		int sizeI = ByteBuffer.wrap(sizeAr).asIntBuffer().get();
+		byte[] imageAr = new byte[sizeI];
+		inputStream.read(imageAr);
+		BufferedImage image = ImageIO.read(new ByteArrayInputStream(imageAr));
+
+		Sobel sobel = new Sobel();
+		BufferedImage newImage = sobel.process(image);
+
+		OutputStream outputStream = socket.getOutputStream();
 		ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-        ImageIO.write(newImage, "jpg", byteArrayOutputStream);
-        byte[] sizeO = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
-        outputStream.write(sizeO);
-        outputStream.write(byteArrayOutputStream.toByteArray());
-        outputStream.flush();
+		ImageIO.write(newImage, "jpg", byteArrayOutputStream);
+		byte[] sizeO = ByteBuffer.allocate(4).putInt(byteArrayOutputStream.size()).array();
+		outputStream.write(sizeO);
+		outputStream.write(byteArrayOutputStream.toByteArray());
+		outputStream.flush();
+	}
+
+	public static void readDB(String dbName, ArrayList<String> userArray, ArrayList<String> passArray){
+		String line = null;
+		int i = 0;
+		try {
+			FileReader fileReader = new FileReader(dbName);
+			BufferedReader bufferedReader = new BufferedReader(fileReader);
+			while((line = bufferedReader.readLine()) != null) {
+				i++;
+				if (i % 2 == 0)
+					userArray.add(line);
+				else
+					passArray.add(line);
+
+			}
+			bufferedReader.close();
+		}
+		catch(FileNotFoundException ex) {
+			System.out.println("Unable to open file '" + dbName + "'");
+		}
+		catch(IOException ex) {
+			System.out.println("Error reading file '" + dbName + "'");
+		}
+	}
+
+	//http://www.java2s.com/Tutorial/Java/0320__Network/ThreadbasedServerSocket.htm
+	private static class socketHandler extends Thread {
+
+		private Socket socket;
+
+		public socketHandler(Socket socket) {
+			this.socket = socket;
+		}
+
+		public void run() {
+			try {
+				convertImage(socket);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
 	}
 }
